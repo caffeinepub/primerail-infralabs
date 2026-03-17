@@ -98,12 +98,41 @@ export interface Submission {
     phone: string;
 }
 export type Time = bigint;
+export type ContentCategory =
+    | { __kind__: "Post" }
+    | { __kind__: "Blog" }
+    | { __kind__: "News" }
+    | { __kind__: "Article" };
+export interface ContentItem {
+    id: bigint;
+    title: string;
+    body: string;
+    category: ContentCategory;
+    imageUrl: Option<string>;
+    author: string;
+    createdAt: Time;
+    published: boolean;
+}
+export type UserRole =
+    | { __kind__: "admin" }
+    | { __kind__: "user" }
+    | { __kind__: "guest" };
 export interface backendInterface {
     getAllSubmissions(): Promise<Array<Submission>>;
     getAllSubmissionsSortedByTimestamp(): Promise<Array<Submission>>;
     getSubmissionsByEmail(email: string): Promise<Array<Submission>>;
     getSubmissionsByPhone(phone: string): Promise<Array<Submission>>;
     submitContactForm(name: string, phone: string, email: string, message: string): Promise<void>;
+    _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    getCallerUserRole(): Promise<UserRole>;
+    isCallerAdmin(): Promise<boolean>;
+    assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    createContent(title: string, body: string, category: ContentCategory, imageUrl: Option<string>, author: string): Promise<bigint>;
+    updateContent(id: bigint, title: string, body: string, category: ContentCategory, imageUrl: Option<string>, author: string, published: boolean): Promise<boolean>;
+    deleteContent(id: bigint): Promise<boolean>;
+    getAllPublishedContent(): Promise<Array<ContentItem>>;
+    getPublishedContentByCategory(category: ContentCategory): Promise<Array<ContentItem>>;
+    getAllContentAdmin(): Promise<Array<ContentItem>>;
 }
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
@@ -176,6 +205,60 @@ export class Backend implements backendInterface {
             const result = await this.actor.submitContactForm(arg0, arg1, arg2, arg3);
             return result;
         }
+    }
+    async _initializeAccessControlWithSecret(userSecret: string): Promise<void> {
+        return await (this.actor as any)._initializeAccessControlWithSecret(userSecret);
+    }
+    async getCallerUserRole(): Promise<UserRole> {
+        return await (this.actor as any).getCallerUserRole();
+    }
+    async isCallerAdmin(): Promise<boolean> {
+        return await (this.actor as any).isCallerAdmin();
+    }
+    async assignCallerUserRole(user: Principal, role: UserRole): Promise<void> {
+        return await (this.actor as any).assignCallerUserRole(user, role);
+    }
+    async createContent(title: string, body: string, category: ContentCategory, imageUrl: Option<string>, author: string): Promise<bigint> {
+        const candidImageUrl = imageUrl.__kind__ === "Some" ? [imageUrl.value] : [];
+        return await (this.actor as any).createContent(title, body, this._encodeCat(category), candidImageUrl, author);
+    }
+    async updateContent(id: bigint, title: string, body: string, category: ContentCategory, imageUrl: Option<string>, author: string, published: boolean): Promise<boolean> {
+        const candidImageUrl = imageUrl.__kind__ === "Some" ? [imageUrl.value] : [];
+        return await (this.actor as any).updateContent(id, title, body, this._encodeCat(category), candidImageUrl, author, published);
+    }
+    async deleteContent(id: bigint): Promise<boolean> {
+        return await (this.actor as any).deleteContent(id);
+    }
+    async getAllPublishedContent(): Promise<Array<ContentItem>> {
+        const result = await (this.actor as any).getAllPublishedContent();
+        return result.map((item: any) => this._decodeContentItem(item));
+    }
+    async getPublishedContentByCategory(category: ContentCategory): Promise<Array<ContentItem>> {
+        const result = await (this.actor as any).getPublishedContentByCategory(this._encodeCat(category));
+        return result.map((item: any) => this._decodeContentItem(item));
+    }
+    async getAllContentAdmin(): Promise<Array<ContentItem>> {
+        const result = await (this.actor as any).getAllContentAdmin();
+        return result.map((item: any) => this._decodeContentItem(item));
+    }
+    private _encodeCat(cat: ContentCategory): any {
+        return { [cat.__kind__]: null };
+    }
+    private _decodeContentItem(item: any): ContentItem {
+        const catKey = Object.keys(item.category)[0] as "Post" | "Blog" | "News" | "Article";
+        const imageUrl: Option<string> = item.imageUrl && item.imageUrl.length > 0
+            ? { __kind__: "Some", value: item.imageUrl[0] }
+            : { __kind__: "None" };
+        return {
+            id: item.id,
+            title: item.title,
+            body: item.body,
+            category: { __kind__: catKey },
+            imageUrl,
+            author: item.author,
+            createdAt: item.createdAt,
+            published: item.published,
+        };
     }
 }
 export interface CreateActorOptions {

@@ -4,6 +4,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  RouterProvider,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
+import {
   Activity,
   ArrowRight,
   BarChart3,
@@ -36,6 +42,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSubmitContactForm } from "./hooks/useQueries";
+import AdminPage from "./pages/AdminPage";
+import ContentHub from "./pages/ContentHub";
 
 const queryClient = new QueryClient();
 
@@ -678,6 +686,15 @@ function Navbar() {
             </div>
           ))}
         </div>
+
+        {/* Admin link */}
+        <a
+          href="/admin"
+          className="hidden lg:flex items-center gap-1.5 text-sm font-semibold bg-orange hover:bg-orange-hover text-white px-4 py-2 rounded-md ml-2 transition-colors"
+          data-ocid="nav.admin.button"
+        >
+          Admin Panel
+        </a>
 
         {/* Mobile hamburger */}
         <button
@@ -1695,6 +1712,7 @@ function PrimerailSite() {
         <TestimonialsSection />
         <StatsSection />
         <ContactSection />
+        <ContentHub />
       </main>
       <Footer />
       <Toaster richColors position="top-right" />
@@ -1702,10 +1720,34 @@ function PrimerailSite() {
   );
 }
 
+const rootRoute = createRootRoute();
+
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: PrimerailSite,
+});
+
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminPage,
+});
+
+const routeTree = rootRoute.addChildren([homeRoute, adminRoute]);
+
+const router = createRouter({ routeTree });
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <PrimerailSite />
+      <RouterProvider router={router} />
     </QueryClientProvider>
   );
 }
